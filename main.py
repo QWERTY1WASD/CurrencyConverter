@@ -1,5 +1,6 @@
 import sys
 import os
+import datetime
 import json
 import requests
 from api_key import coinlayer_api_key
@@ -25,7 +26,6 @@ def catch_error(response) -> bool:
         print(response.url)
         print(f"HTTP статус: {response.status_code}, ({response.reason})")
         sys.exit(1)
-        return False
     elif not response.json()["success"]:
         print("Отказано в доступе")
         print("Причина >>>")
@@ -35,16 +35,30 @@ def catch_error(response) -> bool:
     return True
 
 
-def get_list_of_currency():
-    url = COINLAYER_API_URL + "list"
-    params = {
-        "access_key": coinlayer_api_key
-    }
+def create_response(endpoint, params, filename):
+    url = COINLAYER_API_URL + endpoint
     response = requests.get(url, params=params)
     if not catch_error(response):
         return
-    with open(LIST_OF_CURRENCY_JSON_FILENAME, "w", encoding="utf-8") as f:
-        json.dump(response.json(), f)
+    with open(filename, "w", encoding="utf-8") as f:
+        result = response.json()
+        result['date'] = str(datetime.date.today())
+        json.dump(result, f)
+
+
+def get_list_of_currency():
+    params = {
+        "access_key": coinlayer_api_key,
+    }
+    create_response("list", params, LIST_OF_CURRENCY_JSON_FILENAME)
+
+
+def get_live_exchange_rate():
+    params = {
+        "access_key": coinlayer_api_key,
+        "symbols": SYMBOLS,
+    }
+    create_response("live", params, LIVE_EXCHANGE_RATE_JSON_FILENAME)
 
 
 def print_currency():
@@ -61,19 +75,6 @@ def print_currency():
     print()
 
 
-def get_live_exchange_rate():
-    url = COINLAYER_API_URL + "live"
-    params = {
-        "access_key": coinlayer_api_key,
-        "symbols": SYMBOLS,
-    }
-    response = requests.get(url, params=params)
-    if not catch_error(response):
-        return
-    with open(LIVE_EXCHANGE_RATE_JSON_FILENAME, "w", encoding="utf-8") as f:
-        json.dump(response.json(), f)
-
-
 def print_exchange_rate():
     rate = load_data(LIVE_EXCHANGE_RATE_JSON_FILENAME)
     if rate is None:
@@ -83,9 +84,19 @@ def print_exchange_rate():
         print(f"1 {name} = {cost} {rate['target']}")
 
 
+def check_and_reload_data():
+    # Нет смысла обновлять файл со всеми валютами каждый день
+    # currency = load_data(LIST_OF_CURRENCY_JSON_FILENAME)
+    # if currency['date'] != str(datetime.date.today()):
+    #     get_list_of_currency()
+    rate = load_data(LIVE_EXCHANGE_RATE_JSON_FILENAME)  # Обновление курса каждый день
+    if rate['date'] != str(datetime.date.today()):
+        get_live_exchange_rate()
+
+
 def main():
+    get_list_of_currency()
     get_live_exchange_rate()
-    print_exchange_rate()
 
 
 if __name__ == "__main__":
