@@ -1,10 +1,22 @@
 import sys
+import os
 import json
 import requests
-from api_keys import coinlayer_api_key
+from api_key import coinlayer_api_key
 
 
 COINLAYER_API_URL = "http://api.coinlayer.com/api/"
+LIST_OF_CURRENCY_JSON_FILENAME = "data/list_of_currency.json"
+LIVE_EXCHANGE_RATE_JSON_FILENAME = "data/list_of_exchange_rate.json"
+SYMBOLS = "BTC,ETH,USDT,BNB,XRP,USDC,STETH"
+
+
+def load_data(filename):
+    if not os.path.exists(filename):
+        print(f"Ошибка. Файл '{filename}' не найден")
+        return
+    with open(filename, 'r', encoding="utf-8") as f:
+        return json.load(f)
 
 
 def catch_error(response) -> bool:
@@ -31,22 +43,49 @@ def get_list_of_currency():
     response = requests.get(url, params=params)
     if not catch_error(response):
         return
-    return response.json()
+    with open(LIST_OF_CURRENCY_JSON_FILENAME, "w", encoding="utf-8") as f:
+        json.dump(response.json(), f)
 
 
-def main():
-    result = get_list_of_currency()
-    currencies = result["fiat"]
-    crypto_currencies = result["crypto"]
+def print_currency():
+    currencies = load_data(LIST_OF_CURRENCY_JSON_FILENAME)
+    if currencies is None:
+        return
     print("Валюта")
-    for key, value in currencies.items():
+    for key, value in currencies['fiat'].items():
         print(f"{key}: {value}")
     print()
     print("Криптовалюта")
-    for value in crypto_currencies.values():
+    for value in currencies['crypto'].values():
         print(f"{value['symbol']}: {value['name']}")
     print()
 
+
+def get_live_exchange_rate():
+    url = COINLAYER_API_URL + "live"
+    params = {
+        "access_key": coinlayer_api_key,
+        "symbols": SYMBOLS,
+    }
+    response = requests.get(url, params=params)
+    if not catch_error(response):
+        return
+    with open(LIVE_EXCHANGE_RATE_JSON_FILENAME, "w", encoding="utf-8") as f:
+        json.dump(response.json(), f)
+
+
+def print_exchange_rate():
+    rate = load_data(LIVE_EXCHANGE_RATE_JSON_FILENAME)
+    if rate is None:
+        return
+    print(f"Стоимость криптовалюты в {rate['target']}")
+    for name, cost in rate['rates'].items():
+        print(f"1 {name} = {cost} {rate['target']}")
+
+
+def main():
+    get_live_exchange_rate()
+    print_exchange_rate()
 
 
 if __name__ == "__main__":
