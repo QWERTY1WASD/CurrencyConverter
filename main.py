@@ -92,6 +92,7 @@ def check_and_reload_data():
     rate = load_data(LIVE_EXCHANGE_RATE_JSON_FILENAME)  # Обновление курса каждый день
     if rate['date'] != str(datetime.date.today()):
         get_live_exchange_rate()
+        print("Курс обновлён")
 
 
 def main():
